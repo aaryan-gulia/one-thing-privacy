@@ -5,6 +5,17 @@ const imageExtensions = new Map([
   ["image/heif", "heif"],
 ]);
 
+function requestUuid(value) {
+  if (
+    typeof value !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  )
+    throw new Error("Request ID must be a UUID");
+  return value;
+}
+
 export class AgentApiError extends Error {
   constructor(message, status, code) {
     super(message);
@@ -163,6 +174,34 @@ export function createAgentClient({
       });
     },
     carryGoal: (entryId) => rpc("carry_daily_goal", { p_entry_id: entryId }),
+    createGoalV2: async (text, requestId) =>
+      rpc("create_text_goal_v2", {
+        p_caption: caption(text),
+        p_request_id: requestUuid(requestId),
+      }),
+    carryGoalV2: async (entryId, requestId) =>
+      rpc("carry_goal_v2", {
+        p_entry_id: entryId,
+        p_request_id: requestUuid(requestId),
+      }),
+    listCompletionFeed: async ({ limit = 20, before } = {}) => {
+      if (!Number.isInteger(limit) || limit < 1 || limit > 50)
+        throw new Error("Feed limit must be 1..50");
+      if (
+        before !== undefined &&
+        (typeof before.completedAt !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(
+            before.completedAt,
+          ) ||
+          !Number.isFinite(Date.parse(before.completedAt)))
+      )
+        throw new Error("Invalid completion cursor timestamp");
+      return rpc("list_completion_feed_v2", {
+        p_limit: limit,
+        p_before_completed_at: before?.completedAt ?? null,
+        p_before_id: before === undefined ? null : requestUuid(before.id),
+      });
+    },
     async completeGoal(entryId, proofPhotoPath, note = null) {
       return rpc("complete_daily_goal", {
         p_entry_id: entryId,

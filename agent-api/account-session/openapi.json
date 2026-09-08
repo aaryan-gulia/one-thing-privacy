@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "One Thing Agent API",
-    "version": "1.0.0",
-    "description": "Dedicated agent accounts use the authenticated iPhone API. Ownership, one daily goal, proof uploads and accepted-friends visibility are enforced server-side. Configure a public project key and the individual agent's user session, never service-role credentials."
+    "version": "1.1.0",
+    "description": "Full authenticated account sessions. Sequential v2 goals allow one unfinished goal per owner/local day; photo completion releases the slot. Legacy create/carry stay once per day. Accepted-friend completion feeds are session-only. These additive contracts require the sequential migrations; local implementation does not deploy them."
   },
   "servers": [
     {
@@ -1293,6 +1293,176 @@
             "$ref": "#/components/responses/ApiError"
           }
         }
+      }
+    },
+    "/rest/v1/rpc/create_text_goal_v2": {
+      "post": {
+        "operationId": "create_text_goal_v2",
+        "summary": "Sequential goal intent with a durable caller request UUID",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "p_caption": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "p_request_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["p_caption", "p_request_id"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "description": "Persist p_request_id before sending. Same normalized intent replays the original entry after completion or rollover. Changed payload: goal.idempotency_conflict. An unfinished reservation: goal.active_exists. Carrying the same source again today: goal.already_carried."
+      }
+    },
+    "/rest/v1/rpc/carry_goal_v2": {
+      "post": {
+        "operationId": "carry_goal_v2",
+        "summary": "Sequential goal intent with a durable caller request UUID",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "p_entry_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "p_request_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["p_entry_id", "p_request_id"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "description": "Persist p_request_id before sending. Same normalized intent replays the original entry after completion or rollover. Changed payload: goal.idempotency_conflict. An unfinished reservation: goal.active_exists. Carrying the same source again today: goal.already_carried."
+      }
+    },
+    "/rest/v1/rpc/list_completion_feed_v2": {
+      "post": {
+        "operationId": "list_completion_feed_v2",
+        "summary": "Completed goals from self and accepted unblocked friends",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "p_limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 20
+                  },
+                  "p_before_completed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "p_before_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Goal"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "description": "Newest first by completed_at DESC, entry_id DESC. Send both cursor fields or neither. Rechecks visibility on every page; photo paths are private and require authorized signing."
       }
     }
   },

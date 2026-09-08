@@ -1,27 +1,457 @@
 {
   "openapi": "3.1.0",
-  "info": {"title": "One Thing agent posting API", "version": "1.0.0", "description": "Private per-user posting. All responses use Cache-Control: no-store; all successful operations and replays return 200. Goal summaries omit all media storage paths. Keys expire after 90 days. 60 requests per key per minute; 10 new photo reservations per user per UTC day."},
-  "servers": [{"url":"https://zalmsnnwlhbrglpkymne.supabase.co/functions/v1/agent-api/v1"}],
-  "security": [{"agentKey":[]}],
+  "info": {
+    "title": "One Thing agent posting API",
+    "version": "1.1.0",
+    "description": "Private per-user posting. All responses use Cache-Control: no-store; all successful operations and replays return 200. Goal summaries omit all media storage paths. Keys expire after 90 days. 60 requests per key per minute; 10 new photo reservations per user per UTC day. Sequential creation allows another goal after photo completion, with one unfinished reservation per owner/local day across app and all keys. Removing unfinished content does not release its slot. No friend feed permission. Requires the sequential adapter migration and updated handler."
+  },
+  "servers": [
+    {
+      "url": "https://zalmsnnwlhbrglpkymne.supabase.co/functions/v1/agent-api/v1"
+    }
+  ],
+  "security": [
+    {
+      "agentKey": []
+    }
+  ],
   "paths": {
-    "/me": {"get": {"operationId":"getAgentIdentity", "responses": {"200":{"description":"Current key identity (no internal key ID)","headers":{"Cache-Control":{"$ref":"#/components/headers/NoStore"}},"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Identity"}}}},"default":{"$ref":"#/components/responses/Error"}}}},
-    "/goals/today": {"get": {"operationId":"getTodayGoal", "responses": {"200":{"$ref":"#/components/responses/Goal"},"default":{"$ref":"#/components/responses/Error"}}}},
-    "/goals": {"post": {"operationId":"createGoal", "parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","additionalProperties":false,"required":["caption"],"properties":{"caption":{"type":"string","minLength":1,"maxLength":120,"description":"Trimmed Unicode characters; JSON body maximum 4096 bytes."}}}}}},"responses":{"200":{"$ref":"#/components/responses/Goal"},"default":{"$ref":"#/components/responses/Error"}}}},
-    "/photos": {"post": {"operationId":"uploadPhoto", "description":"Raw image bytes (maximum 10485760 bytes), never multipart or a URL. Exact same bytes and MIME with the same UUID replay the reservation without spending quota.","parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"image/jpeg":{"schema":{"type":"string","format":"binary"}},"image/png":{"schema":{"type":"string","format":"binary"}},"image/webp":{"schema":{"type":"string","format":"binary"}}}},"responses":{"200":{"description":"Private photo identifier; no path or URL","headers":{"Cache-Control":{"$ref":"#/components/headers/NoStore"}},"content":{"application/json":{"schema":{"type":"object","additionalProperties":false,"required":["photoId"],"properties":{"photoId":{"type":"string","format":"uuid"}}}}}},"default":{"$ref":"#/components/responses/Error"}}}},
-    "/goals/{goalId}/complete": {"post": {"operationId":"completeGoal","description":"Completes today's active goal with an uploaded ready photo belonging to this same API key.","parameters":[{"name":"goalId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","additionalProperties":false,"required":["photoId"],"properties":{"photoId":{"type":"string","format":"uuid"},"note":{"type":"string","maxLength":120,"description":"Trimmed Unicode characters. Empty or absent means no note."}}}}}},"responses":{"200":{"$ref":"#/components/responses/Goal"},"default":{"$ref":"#/components/responses/Error"}}}}
+    "/me": {
+      "get": {
+        "operationId": "getAgentIdentity",
+        "responses": {
+          "200": {
+            "description": "Current key identity (no internal key ID)",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/goals/today": {
+      "get": {
+        "operationId": "getTodayGoal",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Goal"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/goals": {
+      "post": {
+        "operationId": "createGoal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["caption"],
+                "properties": {
+                  "caption": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "Trimmed Unicode characters; JSON body maximum 4096 bytes."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Goal"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Retain the Idempotency-Key across uncertain responses: each key/operation replays its original response after completion or rollover. Use a fresh UUID for a deliberate new goal after proof completion; an active reservation returns goal.active_exists (409). Different keys do not share replay records, but share the owner slot."
+      }
+    },
+    "/photos": {
+      "post": {
+        "operationId": "uploadPhoto",
+        "description": "Raw image bytes (maximum 10485760 bytes), never multipart or a URL. Exact same bytes and MIME with the same UUID replay the reservation without spending quota.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Private photo identifier; no path or URL",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["photoId"],
+                  "properties": {
+                    "photoId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/goals/{goalId}/complete": {
+      "post": {
+        "operationId": "completeGoal",
+        "description": "Completes today's active goal with an uploaded ready photo belonging to this same API key.",
+        "parameters": [
+          {
+            "name": "goalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["photoId"],
+                "properties": {
+                  "photoId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "description": "Trimmed Unicode characters. Empty or absent means no note."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Goal"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
   },
   "components": {
-    "securitySchemes":{"agentKey":{"type":"http","scheme":"bearer","bearerFormat":"otk_ followed by 64 lowercase hexadecimal characters"}},
-    "parameters":{"IdempotencyKey":{"name":"Idempotency-Key","in":"header","required":true,"description":"Persist a UUID per operation. Same key + operation + UUID + canonical content returns the original response, including after date rollover. Changed content returns 409.","schema":{"type":"string","format":"uuid"}}},
-    "headers":{"NoStore":{"schema":{"type":"string","const":"no-store"}}},
+    "securitySchemes": {
+      "agentKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "otk_ followed by 64 lowercase hexadecimal characters"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Persist a UUID per operation. Same key + operation + UUID + canonical content returns the original response, including after date rollover. Changed content returns 409.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "headers": {
+      "NoStore": {
+        "schema": {
+          "type": "string",
+          "const": "no-store"
+        }
+      }
+    },
     "responses": {
-      "Goal":{"description":"Canonical goal summary with media path fields omitted. Today returns null if no goal exists; mutation success always contains a goal.","headers":{"Cache-Control":{"$ref":"#/components/headers/NoStore"}},"content":{"application/json":{"schema":{"type":"object","additionalProperties":false,"required":["goal"],"properties":{"goal":{"oneOf":[{"$ref":"#/components/schemas/Goal"},{"type":"null"}]}}}}}},
-      "Error":{"description":"400 agent.invalid_input or goal.invalid_input; 401 agent.unauthenticated, goal.unauthenticated or goal.profile_required; 403 agent.forbidden; 404 agent.not_found or goal.not_found (also unknown route); 405 agent.method_not_allowed; 409 agent.idempotency_conflict, agent.photo_not_ready, agent.photo_consumed, goal.daily_slot_taken or goal.not_completable; 413 agent.too_large; 415 agent.unsupported_media; 429 agent.rate_limited or agent.photo_quota; 503 agent.unavailable. Invalid, expired and revoked keys are indistinguishable. Authentication precedes routing and body reading.","headers":{"Cache-Control":{"$ref":"#/components/headers/NoStore"},"Retry-After":{"description":"Present on 429; positive delay in seconds (60 for rate, until next UTC day for quota)","schema":{"type":"integer","minimum":1}},"Allow":{"description":"Present on 405","schema":{"type":"string","enum":["GET","POST"]}}},"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}
+      "Goal": {
+        "description": "Canonical goal summary with media path fields omitted. Today returns null if no goal exists; mutation success always contains a goal.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["goal"],
+              "properties": {
+                "goal": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Goal"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "description": "400 agent.invalid_input or goal.invalid_input; 401 agent.unauthenticated, goal.unauthenticated or goal.profile_required; 403 agent.forbidden; 404 agent.not_found or goal.not_found (also unknown route); 405 agent.method_not_allowed; 409 agent.idempotency_conflict, agent.photo_not_ready, agent.photo_consumed, goal.daily_slot_taken or goal.not_completable; 413 agent.too_large; 415 agent.unsupported_media; 429 agent.rate_limited or agent.photo_quota; 503 agent.unavailable. Invalid, expired and revoked keys are indistinguishable. Authentication precedes routing and body reading.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "Retry-After": {
+            "description": "Present on 429; positive delay in seconds (60 for rate, until next UTC day for quota)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "Allow": {
+            "description": "Present on 405",
+            "schema": {
+              "type": "string",
+              "enum": ["GET", "POST"]
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
     },
     "schemas": {
-      "Identity":{"type":"object","additionalProperties":false,"required":["userId","timezone","scopes","expiresAt"],"properties":{"userId":{"type":"string","format":"uuid"},"timezone":{"type":"string"},"scopes":{"type":"array","items":{"type":"string","enum":["goals:read","goals:write","proofs:write"]}},"expiresAt":{"type":"string","format":"date-time"}}},
-      "Goal":{"type":"object","additionalProperties":false,"required":["entry_id","user_id","username","display_name","goal_date","timezone","caption","state","completion_note","completed_at","carried_from_entry_id","carried_from_goal_date","correction_deadline","edited_at","created_at","cheer_count","cheered_by_me"],"properties":{"entry_id":{"type":"string","format":"uuid"},"user_id":{"type":"string","format":"uuid"},"username":{"type":"string"},"display_name":{"type":"string"},"goal_date":{"type":"string","format":"date"},"timezone":{"type":"string"},"caption":{"type":["string","null"]},"state":{"type":"string","enum":["active","complete","removed"]},"completion_note":{"type":["string","null"]},"completed_at":{"type":["string","null"],"format":"date-time"},"carried_from_entry_id":{"type":["string","null"],"format":"uuid"},"carried_from_goal_date":{"type":["string","null"],"format":"date"},"correction_deadline":{"type":"string","format":"date-time"},"edited_at":{"type":["string","null"],"format":"date-time"},"created_at":{"type":"string","format":"date-time"},"cheer_count":{"type":"integer","minimum":0},"cheered_by_me":{"type":"boolean"}}},
-      "Error":{"type":"object","additionalProperties":false,"required":["error"],"properties":{"error":{"type":"object","additionalProperties":false,"required":["code","message"],"properties":{"code":{"type":"string","enum":["agent.unauthenticated","agent.forbidden","agent.not_found","agent.invalid_input","agent.method_not_allowed","agent.idempotency_conflict","agent.photo_not_ready","agent.photo_consumed","agent.too_large","agent.unsupported_media","agent.rate_limited","agent.photo_quota","agent.unavailable","goal.daily_slot_taken","goal.not_completable","goal.invalid_input","goal.not_found","goal.profile_required","goal.unauthenticated"]},"message":{"type":"string"}}}}}
+      "Identity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["userId", "timezone", "scopes", "expiresAt"],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["goals:read", "goals:write", "proofs:write"]
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Goal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entry_id",
+          "user_id",
+          "username",
+          "display_name",
+          "goal_date",
+          "timezone",
+          "caption",
+          "state",
+          "completion_note",
+          "completed_at",
+          "carried_from_entry_id",
+          "carried_from_goal_date",
+          "correction_deadline",
+          "edited_at",
+          "created_at",
+          "cheer_count",
+          "cheered_by_me"
+        ],
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "goal_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "caption": {
+            "type": ["string", "null"]
+          },
+          "state": {
+            "type": "string",
+            "enum": ["active", "complete", "removed"]
+          },
+          "completion_note": {
+            "type": ["string", "null"]
+          },
+          "completed_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "carried_from_entry_id": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "carried_from_goal_date": {
+            "type": ["string", "null"],
+            "format": "date"
+          },
+          "correction_deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "edited_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cheer_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cheered_by_me": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "agent.unauthenticated",
+                  "agent.forbidden",
+                  "agent.not_found",
+                  "agent.invalid_input",
+                  "agent.method_not_allowed",
+                  "agent.idempotency_conflict",
+                  "agent.photo_not_ready",
+                  "agent.photo_consumed",
+                  "agent.too_large",
+                  "agent.unsupported_media",
+                  "agent.rate_limited",
+                  "agent.photo_quota",
+                  "agent.unavailable",
+                  "goal.daily_slot_taken",
+                  "goal.not_completable",
+                  "goal.invalid_input",
+                  "goal.not_found",
+                  "goal.profile_required",
+                  "goal.unauthenticated",
+                  "goal.active_exists",
+                  "goal.idempotency_conflict",
+                  "goal.already_carried"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

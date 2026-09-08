@@ -1,8 +1,10 @@
 # Posting with an agent
 
-The scoped agent-key API is live. Profile → Agent access key controls will be available in an upcoming app build. Until that build is available, an authenticated account owner can create a key using the management RPC example below. Keep the key in your agent's secret store. Anyone holding it can read today's goal, post a goal and upload/complete a photo proof as you. The key cannot manage your account, friends, profile or other keys. Goals remain subject to the app's one-goal-per-local-calendar-day rule, friends-only visibility and ordinary notifications. Completion is limited to today's active goal.
+Sequential goal posting is live and was verified against production on 8 September 2026. Key controls are included in the submitted iPhone build; until it is publicly available, authenticated owners can use the key-management RPCs below (see the [published setup guide](https://aaryan-gulia.github.io/one-thing-privacy/agent-api/) for examples). Keep the revealed key in your agent's secret store. Anyone holding it can read today's goal, post a goal and upload/complete a photo proof as you. The key cannot manage your account, friends, profile or other keys, or read a friend completion feed. Goals keep friends-only visibility and ordinary notifications. Completion is limited to today's active goal.
 
-The base URL is `https://zalmsnnwlhbrglpkymne.supabase.co/functions/v1/agent-api/v1`. [OpenAPI contract](./openapi.json). Production posting, private photo upload, completion, retries, and credential revocation were verified on 7 September 2026. This API deployment does not indicate public App Store availability.
+There is one unfinished reservation per owner/local day across the app and every key. Completing it with photo proof allows another goal with a fresh request UUID, including identical text. Removing unfinished content does not free the slot; midnight opens the next day while old unfinished history stays incomplete. A new create while reserved returns `goal.active_exists` (409). The existing 10-photo-per-UTC-day upload quota still applies.
+
+The base URL is `https://zalmsnnwlhbrglpkymne.supabase.co/functions/v1/agent-api/v1`. [OpenAPI contract](./openapi.json). This endpoint is deployed. Public App Store availability is separate.
 
 ## Create a key with an existing owner session
 
@@ -96,4 +98,10 @@ The secret is shown once and only its SHA-256 digest is stored. It cannot be ret
 
 ## Separate account-session SDK
 
-The [account-session SDK and CLI](./account-session/) sign in as a dedicated agent account and support the broader account API, including accepted friends and carrying eligible unfinished goals. Those tools require a full user session and public project key; they cannot use an `otk_` key. The scoped API above acts as the key owner and supports only today, create, upload, and complete. Its photo formats are JPEG, PNG, and WebP. The account-session SDK accepts JPEG, PNG, HEIC, and HEIF. Do not interchange the authentication, endpoints, upload identifiers, or retry rules.
+The [account-session SDK and CLI](./account-session/) sign in as a dedicated agent account and support the broader account API, including accepted friends, the completion feed and carrying eligible unfinished goals. Those tools require a full user session and public project key; they cannot use an `otk_` key. The scoped API above acts as the key owner and supports only today, create, upload, and complete. Its photo formats are JPEG, PNG, and WebP. The account-session SDK accepts JPEG, PNG, HEIC, and HEIF. Do not interchange the authentication, endpoints, upload identifiers, or retry rules.
+
+## Local verification and deployment order
+
+Apply additive migrations with `supabase migration up --local`, run `supabase functions serve agent-api`, then `npm run test:agent-api`. Integration verifies loopback URLs before creating temporary accounts and removes only its own users/media. It exercises the actual HTTP gateway, service RPC and Storage. The local server must remain running for the integration suite.
+
+For a new deployment, apply migration `20260907000700_agent_api.sql` and all subsequent agent migrations, including sequential migrations `20260908000300` and `20260908000400`, before enabling sequential clients. The production endpoint above already includes them. Only this new function sets `verify_jwt = false` because the handler authenticates opaque keys through restricted service RPCs. The private internal adapter shapes are exported as `AgentRequest` in `supabase/functions/agent-api/handler.ts`. `agent_api_authorize` and `agent_api_execute` require service role privileges plus explicit role checks; app clients must not invoke them. No production deployment is performed by the test command.
