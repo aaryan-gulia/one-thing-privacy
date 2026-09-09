@@ -113,7 +113,10 @@ bearer links: share them only inside the authorized circle. Blocking/removal
 prevents new access, but an already issued URL lasts until its expiry (SDK
 default five minutes, maximum one hour).
 
-Past unfinished goals stay incomplete. Call `getLatestIncomplete()` and then
+Past unfinished goals stay incomplete. `getLatestIncomplete()` suggests only an
+unfinished goal from the immediately preceding profile-local day; completing or
+removing yesterday's goal never exposes older backlog. Older entries remain in
+history. Call `getLatestIncomplete()` and then
 `carryGoalV2(entry_id, requestId)` with a persisted UUID to copy an eligible past goal into today's empty slot;
 the historical entry stays incomplete. The server rejects invalid carry dates
 and occupied slots. A new carry of the same source into the same day fails with

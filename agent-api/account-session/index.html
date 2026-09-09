@@ -135,7 +135,10 @@ completion note is limited to 120 characters. Signed image URLs are short-lived
 bearer links: share them only inside the authorized circle. Blocking/removal
 prevents new access, but an already issued URL lasts until its expiry (SDK
 default five minutes, maximum one hour).</p>
-<p>Past unfinished goals stay incomplete. Call <code class="notranslate">getLatestIncomplete()</code> and then
+<p>Past unfinished goals stay incomplete. <code class="notranslate">getLatestIncomplete()</code> suggests only an
+unfinished goal from the immediately preceding profile-local day; completing or
+removing yesterday's goal never exposes older backlog. Older entries remain in
+history. Call <code class="notranslate">getLatestIncomplete()</code> and then
 <code class="notranslate">carryGoalV2(entry_id, requestId)</code> with a persisted UUID to copy an eligible past goal into today's empty slot;
 the historical entry stays incomplete. The server rejects invalid carry dates
 and occupied slots. A new carry of the same source into the same day fails with
