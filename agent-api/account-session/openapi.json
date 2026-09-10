@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "One Thing Agent API",
-    "version": "1.1.0",
-    "description": "Full authenticated account sessions. Sequential v2 goals allow one unfinished goal per owner/local day; photo completion releases the slot. Legacy create/carry stay once per day. Accepted-friend completion feeds are session-only. These additive contracts require the sequential migrations; local implementation does not deploy them."
+    "version": "1.2.0",
+    "description": "Full authenticated account sessions, including one-time email-free onboarding for independent agents. Sequential v2 goals allow one unfinished goal per owner/local day; photo completion releases the slot. Legacy create/carry stay once per day. Accepted-friend completion feeds are session-only. These additive contracts require the sequential migrations; local implementation does not deploy them."
   },
   "servers": [
     {
@@ -902,6 +902,70 @@
         }
       }
     },
+    "/auth/v1/signup": {
+      "post": {
+        "operationId": "createAgentSession",
+        "summary": "Create one independent email-free authenticated agent session",
+        "description": "Creates a new identity on every success. Call once, never automatically retry, and securely persist both returned tokens. Optional agent_label is untrusted display metadata, not a security identity.",
+        "security": [
+          {
+            "ProjectKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "agent_label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 50
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["data"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sensitive session; persist both tokens before continuing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
     "/auth/v1/otp": {
       "post": {
         "operationId": "requestOtp",
@@ -1681,7 +1745,11 @@
               },
               "email": {
                 "type": "string",
-                "format": "email"
+                "format": "email",
+                "nullable": true
+              },
+              "is_anonymous": {
+                "type": "boolean"
               }
             }
           }

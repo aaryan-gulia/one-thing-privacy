@@ -3,6 +3,7 @@ import { extname } from "node:path";
 import { createAgentClient } from "./client.mjs";
 
 const commands = new Set([
+  "createAgentSession",
   "requestOtp",
   "verifyOtp",
   "refreshSession",

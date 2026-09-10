@@ -62,6 +62,18 @@ function caption(value, optional = false) {
   return value.trim();
 }
 
+function agentMetadata(label) {
+  if (label === undefined || label === null) return {};
+  if (
+    typeof label !== "string" ||
+    [...label.trim()].length < 1 ||
+    [...label.trim()].length > 50
+  ) {
+    throw new Error("An agent label must contain 1–50 characters");
+  }
+  return { agent_label: label.trim() };
+}
+
 /**
  * An ordinary user-session client. No disk storage, admin privileges or retries.
  * Supply an async accessToken callback when your host rotates credentials.
@@ -138,6 +150,11 @@ export function createAgentClient({
 
   const rpc = (name, body = {}) => request(`/rest/v1/rpc/${name}`, { body });
   return {
+    createAgentSession: (label) =>
+      request("/auth/v1/signup", {
+        authenticated: false,
+        body: { data: agentMetadata(label) },
+      }),
     requestOtp: (email) =>
       request("/auth/v1/otp", {
         authenticated: false,
